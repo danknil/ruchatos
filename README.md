@@ -1,4 +1,4 @@
-# DankOS
+# RuchatOS
 
 ### My operating system written in rust. Developing mainly for coursework.
 
