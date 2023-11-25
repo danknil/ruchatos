@@ -2,20 +2,24 @@
 #![no_main]
 
 pub(crate) mod elf_app;
-mod allocator;
-mod logger;
-mod text_output;
+pub(crate) mod allocator;
+pub(crate) mod logger;
+pub(crate) mod text_output;
 
 use core::panic::PanicInfo;
 use log::{LevelFilter, trace};
 use r_efi::efi::{Boolean, Handle, Status, SystemTable};
 use crate::allocator::EFIAllocator;
-use crate::logger::EfiLogger;
+use crate::logger::EFILogger;
 
 extern crate alloc;
 #[global_allocator]
-static mut ALLOCATOR: EFIAllocator = EFIAllocator::new();
-static mut LOGGER: EfiLogger = EfiLogger::new();
+
+lazy_static! {
+    static mut ALLOCATOR: EFIAllocator = EFIAllocator::new();
+    static mut LOGGER: EFILogger = EFILogger::new();
+    
+}
 
 
 type EfiResult<T> = Result<T, Status>;

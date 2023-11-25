@@ -2,34 +2,33 @@ use alloc::format;
 use alloc::vec::Vec;
 use log::{Level, Metadata, Record};
 use r_efi::efi::SystemTable;
-use r_efi::protocols::simple_text_output;
+use crate::text_output::EfiTextOutput;
 
-pub struct EfiLogger {
-    con_out: Option<*mut simple_text_output::Protocol>
+pub struct EFILogger {
+    stdout: EfiTextOutput
 }
-unsafe impl Send for EfiLogger {}
-unsafe impl Sync for EfiLogger {}
+unsafe impl Send for EFILogger {}
+unsafe impl Sync for EFILogger {}
 
-impl EfiLogger {
-    pub const fn new() -> Self {
-        EfiLogger {
-            con_out: None
+impl EFILogger {
+    pub fn new() -> Self {
+        EFILogger {
+            stdout: EfiTextOutput::new() 
         }
     }
 
     pub fn init(&mut self, system_table: &SystemTable) {
-        self.con_out = unsafe { Some(system_table.con_out) };
+        self.stdout.init(system_table);
     }
 }
 
-impl log::Log for EfiLogger {
+impl log::Log for EFILogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= Level::Info
     }
 
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
-            let con_out = self.con_out.unwrap();
 
             let mut log_result = format!("[{}] ", record.level().as_str());
             if let Some(args) = record.args().as_str() {
@@ -39,7 +38,7 @@ impl log::Log for EfiLogger {
             let mut log_result = log_result.encode_utf16().collect::<Vec<_>>();
             log_result.push(0);
 
-            unsafe { ((&*con_out).output_string)(con_out, log_result.as_mut_ptr()) };
+            self.stdout.output_string(log_result.as_mut_ptr());
         }
     }
 
