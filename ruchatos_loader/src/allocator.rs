@@ -1,8 +1,9 @@
-use core::{ 
+use core::{
     alloc::{GlobalAlloc, Layout},
     ffi::c_void,
-    ptr::null_mut
+    ptr::null_mut,
 };
+
 use r_efi::efi::{BootServices, SystemTable};
 
 // marker that contains pointer to the actual data
@@ -26,7 +27,7 @@ unsafe fn align_block(ptr: *mut u8, align: usize) -> *mut u8 {
         return ptr;
     }
 
-    // 255 & 15 = 0b00010000 - (0b11111100 & 0b00001111) = 16 - 12 = 4
+    // `& (x - 1) = % x` if x is power of 2
     let offset = align - (ptr as usize & (align - 1));
 
     assert!(offset >= POOL_ALIGNMENT);
@@ -46,22 +47,22 @@ unsafe fn unalign_block(ptr: *mut u8, align: usize) -> *mut u8 {
     }
 }
 
-pub struct EFIAllocator<'a> {
-    boot_services: Option<&'a BootServices>,
+pub struct EFIAllocator {
+    boot_services: *mut BootServices,
 }
 
-impl EFIAllocator<'_> {
+impl EFIAllocator {
     pub const fn new() -> Self {
         EFIAllocator {
-            boot_services: None,
+            boot_services: null_mut()
         }
     }
-    pub unsafe fn init(&mut self, system_table: &SystemTable) {
-        self.boot_services = Some(&*(&*(system_table).boot_services))
+    pub fn init(&mut self, system_table: &SystemTable) {
+        self.boot_services = system_table.boot_services
     }
 }
 
-unsafe impl GlobalAlloc for EFIAllocator<'_> {
+unsafe impl GlobalAlloc for EFIAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let size = layout.size();
         let align = layout.align();
@@ -77,7 +78,7 @@ unsafe impl GlobalAlloc for EFIAllocator<'_> {
         }
 
         let result =
-            unsafe { (self.boot_services.unwrap().allocate_pool)(2, layout.size(), &mut ptr) };
+            unsafe { ((&*(self.boot_services)).allocate_pool)(2, with_alignment(size, align), &mut ptr) };
 
         if result.is_error() || ptr.is_null() {
             null_mut()
@@ -88,10 +89,10 @@ unsafe impl GlobalAlloc for EFIAllocator<'_> {
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         assert!(!ptr.is_null());
-        assert!(layout.size() != 0);
+        assert_ne!(layout.size(), 0);
 
         let original = unalign_block(ptr, layout.align());
-        let result = (self.boot_services.unwrap().free_pool)(original as *mut _);
+        let result = ((&*(self.boot_services)).free_pool)(original as *mut _);
 
         assert!(!result.is_error());
     }

@@ -1,5 +1,5 @@
 use efi::Status;
-use r_efi::efi::{protocols, SystemTable, self};
+use r_efi::efi::{self, protocols, SystemTable};
 
 struct Elf64Header {
     e_ident: [u8; 16],
